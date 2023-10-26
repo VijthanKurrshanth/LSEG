@@ -25,7 +25,7 @@ std::string getCurrentTime() {
     localtime_s(&timeInfo, &time); // For Windows. Use localtime_r for POSIX systems.
 
     std::ostringstream oss;
-    oss << std::put_time(&timeInfo, "%Y%m%d-%H%M%S") << '.' << std::setfill('0') << std::setw(3) << ms.count();
+    oss << std::put_time(&timeInfo, "%Y/%m/%d-%H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << ms.count();
 
     return oss.str();
 }
@@ -143,7 +143,7 @@ in_ord* record(std::vector<std::string> row, int order_no){
  * and a newline character is added at the end of the line.
  *
 */
-void writeOrderToFile(std::ofstream& fout, const in_ord* order, float price) {
+void writeOrderToFile(std::ofstream& fout, const in_ord* order, float price) { //
     std::string currentTime = getCurrentTime();
     fout << order->ord_id << ","
          << order->c_ord_id << ","
@@ -164,25 +164,25 @@ bool checkValid(in_ord* order){
     bool valid = true;
     std::set<std::string> instruments = {"Rose","Lavender","Lotus","Tulip","Orchid"};
     auto it = instruments.find(order->inst);
-    if (it == instruments.end()){
-        order->reason += "Invalid instrument. ";
-        order->exec_s = "Reject";
-        order->exec_qty = order->qty;
-        valid = false;
+    if (it == instruments.end()){ // check if the instrument is valid
+        order->reason += "Invalid instrument. "; // update the reason of the order
+        order->exec_s = "Reject"; // update the execution status of the order as Reject
+        order->exec_qty = order->qty; // update the execution quantity of the order
+        valid = false; // update the validity of the order as false
     }
-    if (order->side != 1 && order->side != 2){
+    if (order->side != 1 && order->side != 2){ // check if the side is valid
         order->reason += "Invalid side. ";
         order->exec_s = "Reject";
         order->exec_qty = order->qty;
         valid = false;
     }
-    if (order->price <= 0){
+    if (order->price <= 0){ // check if the price is valid
         order->reason += "Invalid price. ";
         order->exec_s = "Reject";
         order->exec_qty = order->qty;
         valid = false;
     }
-    if (order->qty % 10 != 0 || order->qty == 0 || order->qty > 1000){
+    if (order->qty % 10 != 0 || order->qty == 0 || order->qty > 1000){ // check if the quantity is valid
         order->reason += "Invalid size. ";
         order->exec_s = "Reject";
         order->exec_qty = order->qty;
@@ -211,7 +211,7 @@ int main(){
     std::ifstream fin;
 
     // order file. Change the file name to test with different order files
-    fin.open("orders4.csv");
+    fin.open("orders11.csv");
 
     // Execute a loop until EOF (End of File)
     int line_no = 1;
@@ -220,11 +220,11 @@ int main(){
     std::vector<std::string> row;
     while (std::getline(fin, line)) {
         
-        if (line_no < 3){
+        if (line_no < 3){ //skip first two lines which contains the name and header column name of the csv file
             line_no += 1;
             if (line_no ==2){
-                fout << "execution_rep.csv" << "," << "," << "," << "," << "," << "\n"
-                << "Order ID" << "," 
+                fout << "execution_rep.csv" << "," << "," << "," << "," << "," << "\n" // write the name of the output file
+                << "Order ID" << ","            // write the header column names
                 << "Client Order ID" << ","
                 << "Instrument" << ","
                 << "Side" << ","
@@ -237,7 +237,7 @@ int main(){
             continue;
         }
 
-        row.clear();
+        row.clear(); // clear the vector if it is not empty
 
         // used for breaking words
         std::stringstream s(line);
@@ -252,8 +252,8 @@ int main(){
         }
 
         
-        in_ord* order = record(row, order_no);
-        order_no += 1;
+        in_ord* order = record(row, order_no); // create the order struct using the row in the input order
+        order_no += 1; // increment the order number
 
         // check if the order is valid
         if (!checkValid(order)){
@@ -262,143 +262,147 @@ int main(){
         // if valid, execute the order
         else if (order->inst == "Rose"){
             switch (order->side){
-                case 1:
-                if (!pink_list_rose.empty()){
-                    if (order->price >= pink_list_rose.back()->price){
-                        insertIntoSortedVectorA(blue_list_rose, order);
-                        while (order->qty > 0 && !pink_list_rose.empty() && order->price >= pink_list_rose.back()->price){
-                            if (order->qty == pink_list_rose.back()->qty){
-                                order->exec_s = "Fill";
-                                order->exec_qty = order->qty;
-                                writeOrderToFile(fout, order, pink_list_rose.back()->price);
+                case 1: // buy order
+                if (!pink_list_rose.empty()){ // do the following if there is a sell order in the pink list
+                    if (order->price >= pink_list_rose.back()->price){ // do the following if the price of the buy order is greater than or equal to the price of the sell order in the pink list
+                        insertIntoSortedVectorA(blue_list_rose, order); // insert the order into the blue list
+                        while (order->qty > 0 && !pink_list_rose.empty() && order->price >= pink_list_rose.back()->price){ // do while the quantity of the buy order becomes zero.
+                            if (order->qty == pink_list_rose.back()->qty){ // do the following if the quantity of the buy order is equal to the quantity of the sell order in the pink list
+                                order->exec_s = "Fill"; // update the execution status of the buy order ass Fill
+                                order->exec_qty = order->qty; // update the execution quantity of the buy order
+                                writeOrderToFile(fout, order, pink_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the sell order in the pink list since the input order is a buy order
                                 
 
-                                pink_list_rose.back()->exec_s = "Fill";
+                                pink_list_rose.back()->exec_s = "Fill"; // do the same for the sell order in the pink list
+                                pink_list_rose.back()->exec_qty = pink_list_rose.back()->qty; 
+                                writeOrderToFile(fout, pink_list_rose.back(), pink_list_rose.back()->price); 
+
+                                delete pink_list_rose.back(); // release the sell order memory for the pointer in the back of pink list since it is filled
+                                pink_list_rose.pop_back(); // remove the sell order pointer from the pink list
+                                delete blue_list_rose.back(); // do the same for buy order list
+                                blue_list_rose.pop_back();
+                            }
+                            else if(order->qty > pink_list_rose.back()->qty){ // do the following if the quantity of the buy order is greater than the quantity of the sell order in the pink list
+                                order->exec_s = "Pfill"; // update the execution status of the buy order as Pfill
+                                order->exec_qty = pink_list_rose.back()->qty; // update the execution quantity of the buy order
+                                order->qty -= order->exec_qty; // update the quantity of the buy order
+                                writeOrderToFile(fout, order, pink_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the sell order in the pink list since the input order is a buy order
+
+                                pink_list_rose.back()->exec_s = "Fill"; // do the same for the sell order in the pink list
                                 pink_list_rose.back()->exec_qty = pink_list_rose.back()->qty;
                                 writeOrderToFile(fout, pink_list_rose.back(), pink_list_rose.back()->price);
 
-                                delete pink_list_rose.back();
+                                delete pink_list_rose.back(); // release the sell order memory for the pointer in the back of pink list since it is filled
                                 pink_list_rose.pop_back();
-                                delete blue_list_rose.back();
-                                blue_list_rose.pop_back();
+                                // Here we do not delete the buy order pointer since it is not filled yet
                             }
-                            else if(order->qty > pink_list_rose.back()->qty){
-                                order->exec_s = "Pfill";
-                                order->exec_qty = pink_list_rose.back()->qty;
-                                order->qty -= order->exec_qty;
-                                writeOrderToFile(fout, order, pink_list_rose.back()->price);
-
-                                pink_list_rose.back()->exec_s = "Fill";
-                                pink_list_rose.back()->exec_qty = pink_list_rose.back()->qty;
-                                writeOrderToFile(fout, pink_list_rose.back(), pink_list_rose.back()->price);
-
-                                delete pink_list_rose.back();
-                                pink_list_rose.pop_back();
-                            }
-                            else{
-                                order->exec_s = "Fill";
-                                order->exec_qty = order->qty;
-                                order->qty -= order->exec_qty;
-                                writeOrderToFile(fout, order, pink_list_rose.back()->price);
+                            else{ // do the following if the quantity of the buy order is less than the quantity of the sell order in the pink list
+                                order->exec_s = "Fill"; // update the execution status of the buy order as Fill
+                                order->exec_qty = order->qty; // update the execution quantity of the buy order
+                                order->qty -= order->exec_qty; // update the quantity of the buy order
+                                writeOrderToFile(fout, order, pink_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the sell order in the pink list since the input order is a buy order
                                 
-                                pink_list_rose.back()->exec_s = "Pfill";
-                                pink_list_rose.back()->exec_qty = order->exec_qty;
-                                pink_list_rose.back()->qty -= pink_list_rose.back()->exec_qty;
-                                writeOrderToFile(fout, pink_list_rose.back(), pink_list_rose.back()->price);
+                                pink_list_rose.back()->exec_s = "Pfill"; // update the execution status of the sell order in the pink list as Pfill
+                                pink_list_rose.back()->exec_qty = order->exec_qty; // update the execution quantity of the sell order
+                                pink_list_rose.back()->qty -= pink_list_rose.back()->exec_qty; // update the quantity of the sell order
+                                writeOrderToFile(fout, pink_list_rose.back(), pink_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the sell order in the pink list since the input order is a buy order
 
-                                delete blue_list_rose.back();
+                                delete blue_list_rose.back(); // release the buy order memory for the pointer in the back of blue list since it is filled
                                 blue_list_rose.pop_back();
+                                // Here we do not delete the sell order pointer since it is not filled yet
                             }
                         }
                         
                     }
-                    else{
-                        order->exec_s = "New";
-                        order->exec_qty = order->qty;
-                        order->reason = "";
-                        writeOrderToFile(fout, order, order->price);
-                        insertIntoSortedVectorA(blue_list_rose, order);
+                    else{ // do the following if the price of the buy order is less than the price of the sell order in the pink list. This means it is should be a new order.
+                        order->exec_s = "New"; // update the execution status of the buy order as New
+                        order->exec_qty = order->qty; // update the execution quantity of the buy order
+                        order->reason = ""; // update the reason of the buy order as empty
+                        writeOrderToFile(fout, order, order->price); // write the order to the execution report. Important thing is to use the price of the buy order since the input order is a buy order
+                        insertIntoSortedVectorA(blue_list_rose, order); // insert the order into the blue list
                     }
                 }
-                else{
-                    order->exec_s = "New";
-                    order->exec_qty = order->qty;
-                    order->reason = "";
-                    writeOrderToFile(fout, order, order->price);
-                    insertIntoSortedVectorA(blue_list_rose, order);
+                else{ // do the following if there is no sell order in the pink list. This means it is should be a new order.
+                    order->exec_s = "New"; // update the execution status of the buy order as New
+                    order->exec_qty = order->qty; // update the execution quantity of the buy order
+                    order->reason = ""; // update the reason of the buy order as empty
+                    writeOrderToFile(fout, order, order->price); // write the order to the execution report. Important thing is to use the price of the buy order since the input order is a buy order
+                    insertIntoSortedVectorA(blue_list_rose, order); // insert the order into the blue list
                 }
-                break;
+                break; // end of buy order
 
-                case 2:
-                if (!blue_list_rose.empty()){
-                    if (order->price <= blue_list_rose.back()->price){
-                        insertIntoSortedVectorD(pink_list_rose, order);
-                        while (order->qty > 0 && !blue_list_rose.empty() && order->price <= blue_list_rose.back()->price){
-                            if (order->qty == blue_list_rose.back()->qty){
-                                order->exec_s = "Fill";
-                                order->exec_qty = order->qty;
-                                writeOrderToFile(fout, order, blue_list_rose.back()->price);
+                case 2: // sell order
+                if (!blue_list_rose.empty()){ // do the following if there is a buy order in the blue list
+                    if (order->price <= blue_list_rose.back()->price){ // do the following if the price of the sell order is less than or equal to the price of the buy order in the blue list
+                        insertIntoSortedVectorD(pink_list_rose, order); // insert the order into the pink list
+                        while (order->qty > 0 && !blue_list_rose.empty() && order->price <= blue_list_rose.back()->price){ // do while the quantity of the sell order becomes zero.
+                            if (order->qty == blue_list_rose.back()->qty){ // do the following if the quantity of the sell order is equal to the quantity of the buy order in the blue list
+                                order->exec_s = "Fill"; // update the execution status of the buy order as Fill 
+                                order->exec_qty = order->qty; // update the execution quantity of the buy order
+                                writeOrderToFile(fout, order, blue_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the buy order in the blue list since the input order is a sell order
                                 
 
-                                blue_list_rose.back()->exec_s = "Fill";
+                                blue_list_rose.back()->exec_s = "Fill"; // do the same for the buy order in the blue list
                                 blue_list_rose.back()->exec_qty = blue_list_rose.back()->qty;
                                 writeOrderToFile(fout, blue_list_rose.back(), blue_list_rose.back()->price);
 
-                                delete blue_list_rose.back();
-                                blue_list_rose.pop_back();
-                                delete pink_list_rose.back();
+                                delete blue_list_rose.back(); // release the buy order memory for the pointer in the back of blue list since it is filled
+                                blue_list_rose.pop_back(); // remove the buy order pointer from the blue list
+                                delete pink_list_rose.back(); // do the same for sell order list
                                 pink_list_rose.pop_back();
                             }
-                            else if(order->qty > blue_list_rose.back()->qty){
-                                order->exec_s = "Pfill";
-                                order->exec_qty = blue_list_rose.back()->qty;
-                                order->qty -= order->exec_qty;
-                                writeOrderToFile(fout, order, blue_list_rose.back()->price);
+                            else if(order->qty > blue_list_rose.back()->qty){ // do the following if the quantity of the sell order is greater than the quantity of the buy order in the blue list
+                                order->exec_s = "Pfill"; // update the execution status of the buy order as Pfill
+                                order->exec_qty = blue_list_rose.back()->qty; // update the execution quantity of the buy order
+                                order->qty -= order->exec_qty; // update the quantity of the buy order
+                                writeOrderToFile(fout, order, blue_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the buy order in the blue list since the input order is a sell order
 
-                                blue_list_rose.back()->exec_s = "Fill";
-                                blue_list_rose.back()->exec_qty = blue_list_rose.back()->qty;
-                                writeOrderToFile(fout, blue_list_rose.back(), blue_list_rose.back()->price);
+                                blue_list_rose.back()->exec_s = "Fill"; // do the same for the buy order in the blue list
+                                blue_list_rose.back()->exec_qty = blue_list_rose.back()->qty; // update the execution quantity of the buy order
+                                writeOrderToFile(fout, blue_list_rose.back(), blue_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the buy order in the blue list since the input order is a sell order
 
-                                delete blue_list_rose.back();
-                                blue_list_rose.pop_back();
+                                delete blue_list_rose.back(); // release the buy order memory for the pointer in the back of blue list since it is filled
+                                blue_list_rose.pop_back(); // remove the buy order pointer from the blue list
+                                // Here we do not delete the sell order pointer since it is not filled yet
                             }
-                            else{
-                                order->exec_s = "Fill";
-                                order->exec_qty = order->qty;
-                                order->qty -= order->exec_qty;
-                                writeOrderToFile(fout, order, blue_list_rose.back()->price);
+                            else{ // do the following if the quantity of the sell order is less than the quantity of the buy order in the blue list
+                                order->exec_s = "Fill"; // update the execution status of the buy order as Fill
+                                order->exec_qty = order->qty; // update the execution quantity of the buy order
+                                order->qty -= order->exec_qty; // update the quantity of the buy order
+                                writeOrderToFile(fout, order, blue_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the buy order in the blue list since the input order is a sell order
 
-                                blue_list_rose.back()->exec_s = "Pfill";
-                                blue_list_rose.back()->exec_qty = order->exec_qty;
-                                blue_list_rose.back()->qty -= blue_list_rose.back()->exec_qty;
-                                writeOrderToFile(fout, blue_list_rose.back(), blue_list_rose.back()->price);
+                                blue_list_rose.back()->exec_s = "Pfill"; // update the execution status of the buy order as Pfill
+                                blue_list_rose.back()->exec_qty = order->exec_qty; // update the execution quantity of the buy order
+                                blue_list_rose.back()->qty -= blue_list_rose.back()->exec_qty; // update the quantity of the buy order
+                                writeOrderToFile(fout, blue_list_rose.back(), blue_list_rose.back()->price); // write the order to the execution report. Important thing is to use the price of the buy order in the blue list since the input order is a sell order
 
-                                delete pink_list_rose.back();
-                                pink_list_rose.pop_back();
+                                delete pink_list_rose.back(); // release the sell order memory for the pointer in the back of pink list since it is filled
+                                pink_list_rose.pop_back(); // remove the sell order pointer from the pink list
+                                // Here we do not delete the buy order pointer since it is not filled yet
                             }
                         }
                         
                     }
-                    else{
-                        order->exec_s = "New";
-                        order->exec_qty = order->qty;
-                        order->reason = "";
-                        writeOrderToFile(fout, order, order->price);
-                        insertIntoSortedVectorD(pink_list_rose, order);
+                    else{ // do the following if the price of the sell order is greater than the price of the buy order in the blue list. This means it is should be a new order.
+                        order->exec_s = "New"; // update the execution status of the buy order as New
+                        order->exec_qty = order->qty; // update the execution quantity of the buy order
+                        order->reason = ""; // update the reason of the buy order as empty
+                        writeOrderToFile(fout, order, order->price); // write the order to the execution report. Important thing is to use the price of the sell order since the input order is a sell order
+                        insertIntoSortedVectorD(pink_list_rose, order); // insert the order into the pink list
                     }
                 }
-                else{
-                    order->exec_s = "New";
-                    order->exec_qty = order->qty;
-                    order->reason = "";
-                    writeOrderToFile(fout, order, order->price);
-                    insertIntoSortedVectorD(pink_list_rose, order);
+                else{ // do the following if there is no buy order in the blue list. This means it is should be a new order.
+                    order->exec_s = "New"; // update the execution status of the buy order as New
+                    order->exec_qty = order->qty; // update the execution quantity of the buy order
+                    order->reason = ""; // update the reason of the buy order as empty
+                    writeOrderToFile(fout, order, order->price); // write the order to the execution report. Important thing is to use the price of the sell order since the input order is a sell order
+                    insertIntoSortedVectorD(pink_list_rose, order); // insert the order into the pink list
                 }
                 break;
             }
 
         }
-        else if (order->inst == "Lavender"){
+        else if (order->inst == "Lavender"){ // do the same for Lavender
             switch (order->side){
                 case 1:
                 if (!pink_list_lavender.empty()){
@@ -537,7 +541,7 @@ int main(){
             }
 
         }
-        else if (order->inst == "Lotus"){
+        else if (order->inst == "Lotus"){ // do the same for Lotus
             switch (order->side){
                 case 1:
                 if (!pink_list_lotus.empty()){
@@ -677,7 +681,7 @@ int main(){
             }
 
         }
-        else if (order->inst == "Tulip"){
+        else if (order->inst == "Tulip"){ // do the same for Tulip
             switch (order->side){
                 case 1:
                 if (!pink_list_tulip.empty()){
@@ -817,7 +821,7 @@ int main(){
             }
 
         }
-        else{
+        else{ // do the same for Orchid
             switch (order->side){
                 case 1:
                 if (!pink_list_orchid.empty()){
